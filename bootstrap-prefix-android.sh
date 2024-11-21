@@ -622,7 +622,7 @@ bootstrap_gnu() {
 	cd "${S}" || return 1
 
 	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
-
+	export LDFLAGS="${LDFLAGS} -landroid-support -liconv -lm"
 	local -a myconf
 	if [[ ${PN} == "make" && ${PV} == "4.4.1" ]] ; then
 		if [[ ${CHOST} == *-linux-gnu* ]] ; then
@@ -823,6 +823,7 @@ bootstrap_python() {
 	export LDFLAGS="${CFLAGS} -L${ROOT}/tmp/usr/lib"
 
 	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+	export LDFLAGS="${CFLAGS} -L${ROOT}/tmp/usr/lib -landroid-posix-semaphore"
 
 	# set correct flags for runtime for ELF platforms
 	case ${CHOST} in

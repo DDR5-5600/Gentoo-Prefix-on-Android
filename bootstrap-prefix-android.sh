@@ -125,29 +125,6 @@ configure_cflags() {
 	export OVERRIDE_CXXFLAGS="-O2 -pipe"
 
 	case ${CHOST} in
-		*-darwin*)
-			export LDFLAGS="-Wl,-search_paths_first -L${ROOT}/tmp/usr/lib"
-			;;
-		*-solaris*)
-			export LDFLAGS="-L${ROOT}/tmp/usr/lib -R${ROOT}/tmp/usr/lib"
-			;;
-		*)
-			export LDFLAGS="-L${ROOT}/tmp/usr/lib -Wl,-rpath=${ROOT}/tmp/usr/lib"
-			;;
-	esac
-
-	case ${CHOST} in
-		# note: we need CXX for binutils-apple which' ld is c++
-		*64-apple* | sparcv9-*-solaris* | x86_64-*-solaris*)
-			export CC="${CC-gcc} -m64"
-			export CXX="${CXX-g++} -m64"
-			export HOSTCC="${CC}"
-			;;
-		i*86-apple-darwin1*)
-			export CC="${CC-gcc} -m32"
-			export CXX="${CXX-g++} -m32"
-			export HOSTCC="${CC}"
-			;;
 		i*86-pc-linux-gnu)
 			if [[ $(${CC} -dumpspecs | grep -A1 multilib_default) != *m32 ]]; then
 				export CC="${CC-gcc} -m32"
@@ -183,73 +160,7 @@ configure_toolchain() {
 	CC=gcc
 	CXX=g++
 
-	case ${CHOST}:${DARWIN_USE_GCC} in
-		*darwin*:1)
-			einfo "Triggering Darwin with GCC toolchain"
-			compiler_stage1+=" sys-apps/darwin-miscutils"
-			compiler_stage1+=" sys-devel/gcc"
-
-			# binutils-apple/xtools doesn't work (yet) on arm64.  The
-			# profiles will mask and keep using native-cctools for that,
-			# otherwise stage3 and @system will take care of switching
-			# to binutils-apple.
-			# one problem: when we have a really old linker, we need
-			# to use it sooner or else packages like libffi won't
-			# compile.
-			case ${CHOST} in
-				*-darwin[89])
-					linker="=sys-devel/binutils-apple-3.2.6*"
-					;;
-				*)
-					linker="sys-devel/native-cctools"
-					;;
-			esac
-			;;
-		*-darwin*)
-			local ccvers
-			local llvm_deps
-			einfo "Triggering Darwin with LLVM/Clang toolchain"
-			# for compilers choice, see bug:
-			# https://bugs.gentoo.org/show_bug.cgi?id=538366
-			compiler_stage1="sys-apps/darwin-miscutils"
-			compiler_type="clang"
-			ccvers="$(unset CHOST; ${CC} --version 2>/dev/null)"
-			llvm_deps="dev-build/ninja"
-			case "${ccvers}" in
-				*"Apple clang version "*|*"Apple LLVM version "*)
-					# this is Clang, recent enough to compile recent clang
-					compiler_stage1+="
-						${llvm_deps}
-						sys-libs/compiler-rt
-						sys-devel/llvm
-						sys-devel/lld
-						sys-devel/clang-common
-						sys-devel/clang
-					"
-					CC=clang
-					CXX=clang++
-					linker=
-					[[ "${BOOTSTRAP_STAGE}" == stage2 ]] && \
-						linker=sys-devel/lld
-					;;
-				*)
-					eerror "unknown/unsupported compiler"
-					return 1
-					;;
-			esac
-
-			compiler="
-				${llvm_deps}
-				sys-libs/compiler-rt
-				sys-libs/libcxxabi
-				sys-libs/libcxx
-				sys-devel/llvm
-				sys-devel/lld
-				sys-libs/llvm-libunwind
-				sys-devel/clang-common
-				sys-devel/clang
-			"
-			;;
+	case ${CHOST} in
 		*-linux*)
 			is-rap && einfo "Triggering Linux RAP bootstrap"
 			compiler_stage1+=" sys-devel/gcc"
@@ -376,36 +287,6 @@ bootstrap_profile() {
 	fi
 
 	case ${CHOST} in
-		powerpc-apple-darwin9)
-			rev=${CHOST##*darwin}
-			profile="prefix/darwin/macos/10.$((rev - 4))/ppc"
-			;;
-		i*86-apple-darwin9)
-			rev=${CHOST##*darwin}
-			profile="prefix/darwin/macos/10.$((rev - 4))/x86"
-			;;
-		i*86-apple-darwin1[578])
-			eerror "REMOVED ARCH: this 32-bit MacOS architecture was removed,"
-			eerror "bootstrapping is impossible"
-			exit 1
-			;;
-		x86_64-apple-darwin1[5789])
-			rev=${CHOST##*darwin}
-			profile="prefix/darwin/macos/10.$((rev - 4))/x64"
-			;;
-		*64-apple-darwin2[0123456789])
-			# Big Sur is  11.0  darwin20
-			# Monterey is 12.0  darwin21
-			# Ventura is  13.0  darwin22
-			# Sanoma is   14.0  darwin23
-			rev=${CHOST##*darwin}
-			case ${CHOST%%-*} in
-				x86_64)  arch=x64    ;;
-				arm64)   arch=arm64  ;;
-				*)       arch=error  ;;
-			esac
-			profile="prefix/darwin/macos/$((rev - 9)).0/${arch}"
-			;;
 		i*86-pc-linux-gnu)
 			profile=${profile_linux/ARCH/x86}
 			;;
@@ -437,32 +318,12 @@ bootstrap_profile() {
 			profile=${profile_linux/ARCH/arm}
 			profile=${profile/17.0/17.0/armv7a}
 			;;
-		x86_64-pc-solaris2.11)
-			profile="prefix/sunos/solaris/5.11/x64"
-			;;
-		i386-pc-solaris2*|sparc-sun-solaris2*|sparcv9-sun-solaris2*)
-			eerror "REMOVED ARCH: this Solaris architecture was removed,"
-			eerror "bootstrapping is impossible"
-			exit 1
-			;;
-		i586-pc-winnt*|x86_64-pc-cygwin*)
-			eerror "REMOVED ARCH: this Windows architecture was removed,"
-			eerror "bootstrapping is impossible"
-			exit 1
-			;;
 		*)
 			eerror "UNKNOWN ARCH: You need to set up a make.profile symlink to a"
 			eerror "profile in ${PORTDIR} for your CHOST ${CHOST}"
 			exit 1
 			;;
 	esac
-
-	if [[ ${DARWIN_USE_GCC} == 1 ]] ; then
-		# amend profile, to use gcc one
-		profile="${profile}/gcc"
-	elif [[ ${CHOST} == *-darwin* ]] ; then
-		[[ "${BOOTSTRAP_STAGE}" != stage2 ]] && profile+="/clang"
-	fi
 
 	[[ -n ${PROFILE_BASE}${PROFILE_VARIANT} ]] &&
 	profile=${PROFILE_BASE:-prefix}/${profile#prefix/}${PROFILE_VARIANT:+/${PROFILE_VARIANT}}
@@ -627,8 +488,6 @@ bootstrap_portage() {
 	S="${S}/prefix-portage-${PV}"
 	cd "${S}" || return 1
 
-	fix_config_sub
-
 	# disable ipc
 	sed -e "s:_enable_ipc_daemon = True:_enable_ipc_daemon = False:" \
 		-i lib/_emerge/AbstractEbuildProcess.py || \
@@ -685,21 +544,6 @@ bootstrap_portage() {
 	einfo "${A%.tar.*} successfully bootstrapped"
 }
 
-fix_config_sub() {
-	# macOS Big Sur (11.x, darwin20) supports Apple Silicon (arm64),
-	# which config.sub doesn't understand about.  It is, however, Apple
-	# who seem to use arm64-apple-darwin20 CHOST triplets, so patch that
-	# for various versions of autoconf
-	if [[ ${CHOST} == arm64-apple-darwin* ]] ; then
-		# Apple Silicon doesn't use aarch64, but arm64
-		# note: macOS /usr/bin/find knows no -print0 or -exec
-		find . -name "config.sub" | \
-			xargs sed -i -e 's/ arm\(-\*\)* / arm\1 | arm64\1 /'
-		find . -name "config.sub" | \
-			xargs sed -i -e 's/ aarch64 / aarch64 | arm64 /'
-	fi
-}
-
 bootstrap_simple() {
 	local PN PV A S myconf
 	PN=$1
@@ -724,8 +568,6 @@ bootstrap_simple() {
 	[[ ${PIPESTATUS[*]} == '0 0' ]] || return 1
 	S="${S}"/${PN}-${PV}
 	cd "${S}" || return 1
-
-	fix_config_sub
 
 	# for libressl, only provide static lib, such that wget (above)
 	# links it in and we don't have to bother about RPATH or something
@@ -843,8 +685,6 @@ bootstrap_gnu() {
 		fi
 	fi
 
-	fix_config_sub
-
 	if [[ ${PN} == "grep" ]] ; then
 		# Solaris and OSX don't like it when --disable-nls is set,
 		# so just don't set it at all.
@@ -873,12 +713,12 @@ bootstrap_gnu() {
 			"--disable-libsanitizer"
 		)
 
-		if [[ ${CHOST} == *-darwin* ]] ; then
+##		if [[ ${CHOST} == *-darwin* ]] ; then
 			myconf+=(
 				"--with-native-system-header-dir=${ROOT}/MacOSX.sdk/usr/include"
 				"--with-ld=${ROOT}/tmp/usr/bin/ldwrapper"
 			)
-		fi
+##		fi
 
 		export CFLAGS="-O1 -pipe"
 		export CXXFLAGS="-O1 -pipe"
@@ -945,10 +785,10 @@ bootstrap_gnu() {
 		(i?86-*-*)
 			export CFLAGS="-m32"
 			;;
-		(arm64-*-darwin*)
+##		(arm64-*-darwin*)
 			sed -i -e 's/aarch64\*-\*-\*/arm64*-*-*|&/' \
 				configure configure.host
-			;;
+##			;;
 		esac
 	fi
 
@@ -1014,52 +854,6 @@ bootstrap_python() {
 	rm -rf Modules/zlib || return 1
 
 	case ${CHOST} in
-	(*-solaris*)
-		# Solaris' host compiler (if old -- 3.4.3) doesn't grok HUGE_VAL,
-		# and barfs on isnan() so patch it out
-		sed -i \
-			-e '/^#define Py_HUGE_VAL/s/HUGE_VAL$/(__builtin_huge_val())/' \
-			-e '/defined HAVE_DECL_ISNAN/s/ISNAN/USE_FALLBACK/' \
-			Include/pymath.h
-		# OpenIndiana/Solaris 11 defines inet_aton no longer in
-		# libresolv, so use hstrerror to check if we need -lresolv
-		sed -i -e '/AC_CHECK_LIB/s/inet_aton/hstrerror/' \
-			configure.ac || die
-		# we don't regenerate configure at this point, so just force the
-		# fix result
-		export LIBS="${LIBS} -lresolv"
-		;;
-	(*-darwin9)
-		# Darwin 9's kqueue seems to act up (at least at this stage), so
-		# make Python's selectors resort to poll() or select() for the
-		# time being
-		sed -i \
-			-e 's/kqueue/kqueue_DISABLED/' \
-			configure
-		# fixup thread id detection (only needed on vanilla Python tar)
-		efetch "https://dev.gentoo.org/~sam/distfiles/dev-lang/python/python-3.9.6-darwin9_pthreadid.patch"
-		patch -p1 < "${DISTDIR}"/python-3.9.6-darwin9_pthreadid.patch
-		;;
-	(*-openbsd*)
-		# OpenBSD is not a multilib system
-		sed -i \
-			-e '0,/#if defined(__ANDROID__)/{s/ANDROID/OpenBSD/}' \
-			-e '0,/MULTIARCH=/{s/\(MULTIARCH\)=.*/\1=""/}' \
-			configure
-		;;
-	esac
-
-	case ${CHOST} in
-	(*-darwin*)
-		# avoid triggering compiled out system proxy retrieval code (_scproxy)
-		sed -i -e '/sys.platform/s/darwin/disabled-darwin/' \
-			Lib/urllib/request.py
-		;;
-	esac
-
-	fix_config_sub
-
-	case ${CHOST} in
 	(x86_64-*-*|sparcv9-*-*)
 		export CFLAGS="-m64"
 		;;
@@ -1076,14 +870,6 @@ bootstrap_python() {
 			read -r -a flgarg <<< "${CFLAGS}"
 			libdir="-L/usr/lib/$(gcc "${flgarg[@]}" -print-multi-os-directory)"
 		;;
-		x86_64-*-solaris*|sparcv9-*-solaris*)
-			# Like above, make Python know where GCC's 64-bits
-			# libgcc_s.so is on Solaris
-			libdir="-L/usr/sfw/lib/64"
-		;;
-		*-solaris*) # 32bit
-			libdir="-L/usr/sfw/lib"
-		;;
 	esac
 
 	# python refuses to find the zlib headers that are built in the offset,
@@ -1096,15 +882,6 @@ bootstrap_python() {
 			# GNU ld
 			LDFLAGS="${LDFLAGS} -Wl,-rpath,${ROOT}/tmp/usr/lib ${libdir}"
 			LDFLAGS="${LDFLAGS} -Wl,-rpath,${libdir#-L}"
-		;;
-		*-openbsd*)
-			# LLD
-			LDFLAGS="${LDFLAGS} -Wl,-rpath,${ROOT}/tmp/usr/lib"
-		;;
-		*-solaris*)
-			# Sun ld
-			LDFLAGS="${LDFLAGS} -R${ROOT}/tmp/usr/lib ${libdir}"
-			LDFLAGS="${LDFLAGS} -R${libdir#-L}"
 		;;
 	esac
 
@@ -1246,11 +1023,6 @@ bootstrap_zlib_core() {
 
 	# this lib causes issues when emerging python again on Solaris
 	# because the tmp lib path is in the library search path there
-	local x
-	for x in "${ROOT}"/tmp/usr/lib/libz*.a ; do
-		[[ ${x} == *.dll.a ]] && continue # keep Cygwin import lib
-		rm -Rf "${x}"
-	done
 
 	einfo "${A%.tar.*} bootstrapped"
 }
@@ -1474,123 +1246,6 @@ bootstrap_stage1() {
 	BOOTSTRAP_STAGE="stage1" configure_toolchain || return 1
 	export CC CXX
 
-	# default: empty = NO
-	local USEGCC5=
-
-	if [[ ${CHOST} == *-darwin* ]] ; then
-		# setup MacOSX.sdk symlink for GCC, this should probably be
-		# managed using an eselect module in the future
-		# FWIW, just use system (/) if it seems OK, for some reason
-		# early versions of TAPI-based SDKs did not include some symbols
-		# like fclose, which ld64 is able to resolve from the dylibs
-		# although they are unvisible using e.g. nm.
-		rm -f "${ROOT}"/MacOSX.sdk
-		local SDKPATH
-		if [[ -e /usr/lib/libSystem.B.dylib && -d /usr/include ]] ; then
-			SDKPATH=/
-		else
-			SDKPATH=$(xcrun --show-sdk-path --sdk macosx)
-			if [[ -e ${SDKPATH} ]] ; then
-				local fsdk
-				local osvers
-				# try and find a matching OS SDK, xcrun seems to return
-				# the latest installed, so not necessarily the one
-				# matching the macOS version
-				[[ -L ${SDKPATH} ]] && fsdk="$(readlink "${SDKPATH}")"
-				# note readlink -f is not supported on older versions of
-				# macOS so need to emulate it
-				if [[ ${fsdk} != /* ]] ; then
-					# this is not proper, but Apple does not use ../
-					# constructs here, as far as we know
-					fsdk="${SDKPATH%/*}/${fsdk}"
-				fi
-				osvers="$(sw_vers -productVersion)"
-				if [[ ${osvers%%.*} -le 10 ]] ; then
-					osvers=$(echo "${osvers}" | cut -d'.' -f1-2)
-				else
-					osvers=${osvers%%.*}
-				fi
-				fsdk=${fsdk%/MacOSX*.sdk}
-				fsdk=${fsdk}/MacOSX${osvers}.sdk
-				[[ -e ${fsdk} ]] && SDKPATH=${fsdk}
-			fi
-			if [[ ! -e ${SDKPATH} ]] ; then
-				SDKPATH=$(xcodebuild -showsdks | sort -nr \
-					| grep -o "macosx.*" | head -n1)
-				SDKPATH=$(xcode-select -print-path)/SDKs/MacOSX${SDKPATH#macosx}.sdk
-			fi
-		fi
-		( cd "${ROOT}" && ln -s "${SDKPATH}" MacOSX.sdk )
-		einfo "using system sources from ${SDKPATH}"
-
-		# GCC 14 cannot be compiled by versions of Clang at least on
-		# Darwin17, so go the safe route and get GCC-5 which is sufficient
-		# and the last one we can compile without C11.  This also compiles
-		# on Darwin 8 and 9.
-		# see also configure_toolchain
-		case ${CHOST} in
-			*-darwin2[23456789]) :      ;;  # host toolchain can compile gcc-14
-			*-darwin[89])  USEGCC5=yes  ;;
-			*86*-darwin*)  USEGCC5=yes  ;;
-			# arm64/M1 isn't supported by old GCC-5!
-		esac
-	fi
-
-	if [[ -n ${USEGCC5} ]] ; then
-		# benefit from 4.2 if it's present
-		if [[ -e /usr/bin/gcc-4.2 ]] ; then
-			export CC=gcc-4.2
-			export CXX=g++-4.2
-		fi
-
-		[[ -e ${ROOT}/tmp/usr/include/gmp.h ]] \
-			|| (bootstrap_gmp) || return 1
-		[[ -e ${ROOT}/tmp/usr/include/mpfr.h ]] \
-			|| (bootstrap_mpfr) || return 1
-		[[ -e ${ROOT}/tmp/usr/include/mpc.h ]] \
-			|| (bootstrap_mpc) || return 1
-		[[ -x ${ROOT}/tmp/usr/bin/ldwrapper ]] \
-			|| (bootstrap_ldwrapper) || return 1
-		# get ldwrapper target in PATH
-		export BINUTILS_CONFIG_LD="$(type -P ld)"
-		# force deployment target in GCCs build, GCC-5 doesn't quite get
-		# the newer macOS versions (20+) and thus confuses ld when it
-		# passes on the deployment version.  Use High Sierra as it has
-		# everything we need
-		[[ ${CHOST##*darwin} -gt 10 ]] && export MACOSX_DEPLOYMENT_TARGET=10.13
-		[[ -x ${ROOT}/tmp/usr/bin/gcc ]] \
-			|| (bootstrap_gcc5) || return 1
-
-		if [[ ${CHOST##*darwin} -gt 10 ]] ; then
-			# install wrappers in tmp/usr/local/bin which comes before
-			# /tmp/usr/bin in PATH
-			mkdir -p "${ROOT}"/tmp/usr/local/bin
-			rm -f "${ROOT}"/tmp/usr/local/bin/{gcc,${CHOST}-gcc}
-			cat > "${ROOT}/tmp/usr/local/bin/${CHOST}-gcc" <<-EOS
-				#!/usr/bin/env sh
-				export MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}
-				export BINUTILS_CONFIG_LD="$(type -P ld)"
-				exec "${ROOT}"/tmp/usr/bin/${CHOST}-gcc "\$@"
-			EOS
-			chmod 755 "${ROOT}/tmp/usr/local/bin/${CHOST}-gcc"
-			ln -s ${CHOST}-gcc "${ROOT}"/tmp/usr/local/bin/gcc
-
-			rm -f "${ROOT}"/tmp/usr/local/bin/{g++,${CHOST}-g++}
-			cat > "${ROOT}"/tmp/usr/local/bin/${CHOST}-g++ <<-EOS
-				#!/usr/bin/env sh
-				export MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}
-				export BINUTILS_CONFIG_LD="$(type -P ld)"
-				exec "${ROOT}"/tmp/usr/bin/${CHOST}-g++ "\$@"
-			EOS
-			chmod 755 "${ROOT}"/tmp/usr/local/bin/${CHOST}-g++
-			ln -s ${CHOST}-g++ "${ROOT}"/tmp/usr/local/bin/g++
-		fi
-
-		# reset after gcc-4.2 usage
-		export CC=gcc
-		export CXX=g++
-	fi
-
 	# Run all bootstrap_* commands in a subshell since the targets
 	# frequently pollute the environment using exports which affect
 	# packages following (e.g. zlib builds 64-bits)
@@ -1656,19 +1311,6 @@ bootstrap_stage1() {
 	# be identified as stage1-installed like in bug #615410.
 	mkdir -p "${ROOT}"/tmp/usr/local/bin
 	case ${CHOST} in
-		*-darwin*)
-			# Recent Mac OS X have a nice popup to install java when
-			# it's called without being installed, this doesn't stop the
-			# process from going, but keeps popping up a dialog during
-			# the bootstrap process, which is slightly anoying.
-			# Nevertheless, we don't want Java when it's installed to be
-			# detected, so hide during the stage builds
-			{
-				echo "#!$(type -P false)"
-			} > "${ROOT}"/tmp/usr/local/bin/java
-			cp "${ROOT}"/tmp/usr/local/bin/java{,c}
-			chmod 755 "${ROOT}"/tmp/usr/local/bin/java{,c}
-			;;
 		*-linux*)
 			if [[ ! -x "${ROOT}"/tmp/usr/bin/gcc ]] \
 			&& [[ $(gcc -print-prog-name=as),$(gcc -print-prog-name=ld) != /*,/* ]]

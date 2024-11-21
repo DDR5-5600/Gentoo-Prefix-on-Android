@@ -787,7 +787,7 @@ python_ver() {
 	# mismatch error due to Portage using a different version after it
 	# upgraded itself with a newer Python
 	echo 3.11
-	export PYTHON_FULL_VERSION="3.11.7-gentoo-prefix-patched"
+	export PYTHON_FULL_VERSION="3.11.10"
 	# keep this number in line with PV below for stage1,2
 }
 
@@ -994,29 +994,24 @@ bootstrap_zlib_core() {
 }
 
 bootstrap_zlib() {
-	bootstrap_zlib_core 1.2.11 || \
-	bootstrap_zlib_core 1.2.8 || bootstrap_zlib_core 1.2.7 || \
-	bootstrap_zlib_core 1.2.6 || bootstrap_zlib_core 1.2.5
+	bootstrap_zlib_core 1.3.1 || \
+	bootstrap_zlib_core 1.2.13
 }
 
 bootstrap_libffi() {
-	# 3.0.8: last version to bootstrap on Darwin 9 x86
-	bootstrap_gnu libffi 3.4.5 || \
-	bootstrap_gnu libffi 3.3 || \
-	bootstrap_gnu libffi 3.2.1 || \
-	bootstrap_gnu libffi 3.0.8
+	bootstrap_gnu libffi 3.4.2
 }
 
 bootstrap_gmp() {
-	bootstrap_gnu gmp 6.2.1
+	bootstrap_gnu gmp 6.3.0
 }
 
 bootstrap_mpfr() {
-	bootstrap_gnu mpfr 4.1.0
+	bootstrap_gnu mpfr 4.2.1
 }
 
 bootstrap_mpc() {
-	bootstrap_gnu mpc 1.2.1
+	bootstrap_gnu mpc 1.3.1
 }
 
 bootstrap_ldwrapper() {
@@ -1052,38 +1047,23 @@ bootstrap_gcc5() {
 }
 
 bootstrap_sed() {
-	bootstrap_gnu sed 4.9 || bootstrap_gnu sed 4.5 || \
-	bootstrap_gnu sed 4.2.2 || bootstrap_gnu sed 4.2.1
+	bootstrap_gnu sed 4.9
 }
 
 bootstrap_findutils() {
-	bootstrap_gnu findutils 4.9.0 ||
-	bootstrap_gnu findutils 4.7.0 ||
-	bootstrap_gnu findutils 4.5.10 ||
-	bootstrap_gnu findutils 4.2.33
+	bootstrap_gnu findutils 4.10.0
 }
 
 bootstrap_wget() {
-	bootstrap_gnu wget 1.20.1 || \
-	bootstrap_gnu wget 1.17.1 || bootstrap_gnu wget 1.13.4
+	bootstrap_gnu wget 1.24.5
 }
 
 bootstrap_grep() {
-	# don't use 2.13, it contains a bug that bites, bug #425668
-	# 2.9 is the last version provided as tar.gz (platforms without xz)
-	# 2.7 is necessary for Solaris/OpenIndiana (2.8, 2.9 fail to configure)
-	bootstrap_gnu grep 3.3 || \
-	bootstrap_gnu grep 2.9 || bootstrap_gnu grep 2.7 || \
-	bootstrap_gnu grep 2.14 || bootstrap_gnu grep 2.12
+	bootstrap_gnu grep 3.11
 }
 
 bootstrap_coreutils() {
-	# 8.16 is the last version released as tar.gz
-	# 8.18 is necessary for macOS High Sierra (darwin17) and converted
-	#      to tar.gz for this case
-	bootstrap_gnu coreutils 9.5 || \
-	bootstrap_gnu coreutils 8.32 || bootstrap_gnu coreutils 8.30 || \
-	bootstrap_gnu coreutils 8.16 || bootstrap_gnu coreutils 8.17
+	bootstrap_gnu coreutils 9.5
 }
 
 bootstrap_tar() {
@@ -1092,7 +1072,7 @@ bootstrap_tar() {
 
 bootstrap_make() {
 	MAKEOPTS= # no GNU make yet
-	bootstrap_gnu make 4.2.1 || return 1
+	bootstrap_gnu make 4.4.1 || return 1
 	if [[ ${MAKE} == gmake ]] ; then
 		# make make available as gmake
 		( cd "${ROOT}"/tmp/usr/bin && ln -s make gmake )
@@ -1100,66 +1080,49 @@ bootstrap_make() {
 }
 
 bootstrap_patch() {
-	# 2.5.9 needed for OSX 10.6.x still?
-	bootstrap_gnu patch 2.7.5 ||
-	bootstrap_gnu patch 2.7.4 ||
-	bootstrap_gnu patch 2.7.3 ||
-	bootstrap_gnu patch 2.6.1
+	bootstrap_gnu patch 2.7.6
 }
 
 bootstrap_gawk() {
-	bootstrap_gnu gawk 5.0.1 || bootstrap_gnu gawk 4.0.1 || \
-		bootstrap_gnu gawk 3.1.8
+	bootstrap_gnu gawk 5.3.1
 }
 
 bootstrap_binutils() {
-	bootstrap_gnu binutils 2.17
+	bootstrap_gnu binutils 2.42
 }
 
 bootstrap_texinfo() {
-	bootstrap_gnu texinfo 4.8
+	bootstrap_gnu texinfo 7.1.1
 }
 
 bootstrap_bash() {
-	bootstrap_gnu bash 5.2 ||
-	bootstrap_gnu bash 5.1 ||
-	bootstrap_gnu bash 5.0
+	bootstrap_gnu bash 5.2.37
 }
 
 bootstrap_bison() {
-	bootstrap_gnu bison 3.8.2 || \
-	bootstrap_gnu bison 2.6.2 || \
-	bootstrap_gnu bison 2.5.1 || \
-	bootstrap_gnu bison 2.4
+	bootstrap_gnu bison 3.8.2
 }
 
 bootstrap_m4() {
-	bootstrap_gnu m4 1.4.19 || \
-	bootstrap_gnu m4 1.4.18 # version is patched, so beware
+	bootstrap_gnu m4 1.4.19
 }
 
 bootstrap_gzip() {
-	bootstrap_gnu gzip 1.4
+	bootstrap_gnu gzip 1.13
 }
 
 bootstrap_xz() {
-	GNU_URL=http://tukaani.org/xz bootstrap_gnu xz 5.4.5 || \
-	GNU_URL=http://tukaani.org/xz bootstrap_gnu xz 5.2.4 || \
-	GNU_URL=http://tukaani.org/xz bootstrap_gnu xz 5.2.3
+	GNU_URL=http://tukaani.org/xz bootstrap_gnu xz 5.6.3
 }
 
 bootstrap_bzip2() {
-	bootstrap_simple bzip2 1.0.6 gz \
+	bootstrap_simple bzip2 1.0.8 gz \
 		https://sourceware.org/pub/bzip2
 }
 
 bootstrap_libressl() {
 	bootstrap_simple libressl 3.4.3 gz \
 		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL || \
-	bootstrap_simple libressl 3.2.4 gz \
-		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL || \
-	bootstrap_simple libressl 2.8.3 gz \
-		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL
 }
 
 bootstrap_stage_host_gentoo() {

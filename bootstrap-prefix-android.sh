@@ -873,6 +873,14 @@ bootstrap_cmake_core() {
 	PV=${1:-3.16.5}
 	A=cmake-${PV}.tar.gz
 
+	export CC="clang"
+	export CXX="clang++"
+	export CPP="clang-cpp"
+	export LD="ld.lld"
+	export AR="llvm-ar"
+	export NM="llvm-nm"
+	export RANLIB="llvm-ranlib"
+
 	einfo "Bootstrapping ${A%.tar.*}"
 
 	efetch "https://github.com/Kitware/CMake/releases/download/v${PV}/${A}" \

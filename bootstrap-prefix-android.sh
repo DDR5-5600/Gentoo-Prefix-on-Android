@@ -888,18 +888,15 @@ bootstrap_cmake_core() {
 	S="${S}"/cmake-${PV}
 	cd "${S}" || return 1
 
-	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+	efetch "https://raw.githubusercontent.com/termux/termux-packages/refs/heads/master/packages/cmake/Modules-Platform-Android-GNU.cmake.patch" || return 1
+	patch -p1 < ${DISTDIR}/Modules-Platform-Android-GNU.cmake.patch || return 1
 
-	# don't set a POSIX standard, system headers don't like that, #757426
-	sed -i -e 's/^#if !defined(_WIN32) && !defined(__sun)/& \&\& !defined(__APPLE__)/' \
-		Source/cmLoadCommandCommand.cxx \
-		Source/cmStandardLexer.h \
-		Source/cmSystemTools.cxx \
-		Source/cmTimestamp.cxx
+	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
 
 	einfo "Bootstrapping ${A%.tar.*}"
 	estatus "stage1: configuring ${A%.tar.*}"
-	./bootstrap --prefix="${ROOT}"/tmp/usr || return 1
+
+	cmake -D CMAKE_USE_SYSTEM_LIBRARIES=1 -D CMAKE_INSTALL_PREFIX=${ROOT}/tmp/usr ${S}/CMakeLists.txt || return 1
 
 	einfo "Compiling ${A%.tar.*}"
 	emake || return 1

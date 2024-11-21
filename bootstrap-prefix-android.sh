@@ -1052,7 +1052,7 @@ bootstrap_coreutils() {
 }
 
 bootstrap_tar() {
-	bootstrap_gnu tar 1.32 || bootstrap_gnu tar 1.26
+	bootstrap_gnu tar 1.35
 }
 
 bootstrap_make() {

@@ -548,18 +548,9 @@ bootstrap_simple() {
 
 	# for libressl, only provide static lib, such that wget (above)
 	# links it in and we don't have to bother about RPATH or something
-	if [[ ${PN} == "libressl" ]] ; then
-		myconf=(
-			"${myconf[@]}"
-			--enable-static
-			--disable-shared
-		)
-	fi
 
 	einfo "Compiling ${A%.tar.*}"
-	if [[ -x configure ]] ; then
-		econf "${myconf[@]}" || return 1
-	fi
+	./Configure --prefix="${ROOT}"/tmp/usr/local no-srp
 	emake || return 1
 
 	einfo "Installing ${A%.tar.*}"
@@ -703,16 +694,12 @@ bootstrap_gnu() {
 
 	# Gentoo Bug 400831, fails on Ubuntu with libssl-dev installed
 	if [[ ${PN} == "wget" ]] ; then
-		if [[ -x ${ROOT}/tmp/usr/bin/openssl ]] ; then
-			myconf+=(
-				"-with-ssl=openssl"
-				"--with-libssl-prefix=${ROOT}/tmp/usr"
-			)
-			export CPPFLAGS="${CPPFLAGS} -I${ROOT}/tmp/usr/include"
-			export LDFLAGS="${LDFLAGS} -L${ROOT}/tmp/usr/lib"
-		else
-			myconf+=( "--without-ssl" )
-		fi
+		myconf+=(
+			"-with-ssl=openssl"
+			"--with-libssl-prefix=${ROOT}/tmp/usr"
+		)
+		export CPPFLAGS="${CPPFLAGS} -I${ROOT}/tmp/usr/include"
+		export LDFLAGS="${LDFLAGS} -L${ROOT}/tmp/usr/lib"
 	fi
 
 	# SuSE 11.1 has GNU binutils-2.20, choking on crc32_x86
@@ -1112,8 +1099,8 @@ bootstrap_bzip2() {
 }
 
 bootstrap_libressl() {
-	bootstrap_simple libressl 3.4.3 gz \
-		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL
+	bootstrap_simple openssl 3.0.15 gz \
+		https://github.com/openssl/openssl/releases/download/
 }
 
 bootstrap_stage_host_gentoo() {

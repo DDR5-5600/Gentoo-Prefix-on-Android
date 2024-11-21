@@ -144,19 +144,6 @@ configure_toolchain() {
 	compiler_stage1="${gcc_deps} sys-devel/gcc-config"
 	compiler_type="gcc"
 
-	# The host may not have a functioning C++ toolchain, but all
-	# compilers available to us require C++ to build.  The last known
-	# version not to require C++ is gcc-4.7.
-	# We can bootstrap 4.7 in stage1 perhaps if we find envs that do
-	# not have a functioning C++ toolchain, but for now we assume this
-	# is not a problem.
-	# On top of this since gcc-11, C++11 is necessary.  This was
-	# introduced in gcc-4.8, but apparently gcc-5 is still buildable
-	# with Apple's gcc-apple-4.0.1, so that's a good candidate
-	# The Prefix tree only contains gcc-12 as of this writing.
-	# The bootstrap Python 3.7 we have in use requires C11, so Apple's
-	# 4.x line is no longer enough for that.
-
 	CC=gcc
 	CXX=g++
 
@@ -213,16 +200,6 @@ bootstrap_setup() {
 				echo "USE=\"\${USE} ${MAKE_CONF_ADDITIONAL_USE}\""
 			[[ ${OFFLINE_MODE} ]] && \
 				echo 'FETCHCOMMAND="bash -c \"echo I need \${FILE} from \${URI} in \${DISTDIR}; read\""'
-
-			if [[ ${CHOST} == i*86-apple-darwin9 ]] ; then
-				# There's no legitimate reason to use 10.5 with x86 (10.6 and
-				# 10.7 run on every device that ever ran 10.5 x86) but it's
-				# vastly easier to access and faster than ppc.  Don't want to
-				# burden the tree with this aid-arch, so just use the ppc
-				# keyword.
-				echo
-				echo 'ACCEPT_KEYWORDS="~ppc-macos"'
-			fi
 
 			if is-rap ; then
 				# https://bugs.gentoo.org/933100
@@ -713,13 +690,6 @@ bootstrap_gnu() {
 			"--disable-libsanitizer"
 		)
 
-##		if [[ ${CHOST} == *-darwin* ]] ; then
-			myconf+=(
-				"--with-native-system-header-dir=${ROOT}/MacOSX.sdk/usr/include"
-				"--with-ld=${ROOT}/tmp/usr/bin/ldwrapper"
-			)
-##		fi
-
 		export CFLAGS="-O1 -pipe"
 		export CXXFLAGS="-O1 -pipe"
 	fi
@@ -778,17 +748,13 @@ bootstrap_gnu() {
 		myconf+=( "--libdir=${ROOT}/tmp/usr/lib" )
 		sed -i -e '/toolexeclibdir =/s/=.*/= $(libdir)/' Makefile.in
 		# we have to build the libraries for correct bitwidth
-		case $CHOST in
+		case ${CHOST} in
 		(x86_64-*-*|sparcv9-*-*)
 			export CFLAGS="-m64"
 			;;
 		(i?86-*-*)
 			export CFLAGS="-m32"
 			;;
-##		(arm64-*-darwin*)
-			sed -i -e 's/aarch64\*-\*-\*/arm64*-*-*|&/' \
-				configure configure.host
-##			;;
 		esac
 	fi
 
@@ -1486,19 +1452,6 @@ do_emerge_pkgs() {
 		)
 
 		local skip_llvm_pkg_setup=
-		if [[ ${CHOST}:${DARWIN_USE_GCC} == *-darwin*:0 ]] ; then
-			# Clang-based Darwin
-			myuse+=(
-				"-binutils-plugin"
-				"default-compiler-rt"
-				"default-libcxx"
-				"default-lld"
-			)
-			if [[ "${BOOTSTRAP_STAGE}" == stage2 ]] ; then
-				myuse+=( "bootstrap-prefix" )
-				skip_llvm_pkg_setup="yes"
-			fi
-		fi
 
 		local override_make_conf_dir="${PORTAGE_OVERRIDE_EPREFIX}"
 		override_make_conf_dir+="${MAKE_CONF_DIR#"${ROOT}"}"

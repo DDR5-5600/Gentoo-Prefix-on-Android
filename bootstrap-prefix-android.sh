@@ -621,6 +621,8 @@ bootstrap_gnu() {
 	[[ -d ${S} ]] || return 1
 	cd "${S}" || return 1
 
+	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+
 	local -a myconf
 	if [[ ${PN} == "make" && ${PV} == "4.4.1" ]] ; then
 		if [[ ${CHOST} == *-linux-gnu* ]] ; then
@@ -819,6 +821,9 @@ bootstrap_python() {
 	# same for libffi, which installs into compiler's multilib-osdir
 	export CPPFLAGS="-I${ROOT}/tmp/usr/include"
 	export LDFLAGS="${CFLAGS} -L${ROOT}/tmp/usr/lib"
+
+	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+
 	# set correct flags for runtime for ELF platforms
 	case ${CHOST} in
 		*-linux*)
@@ -881,6 +886,8 @@ bootstrap_cmake_core() {
 	[[ ${PIPESTATUS[*]} == '0 0' ]] || return 1
 	S="${S}"/cmake-${PV}
 	cd "${S}" || return 1
+
+	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
 
 	# don't set a POSIX standard, system headers don't like that, #757426
 	sed -i -e 's/^#if !defined(_WIN32) && !defined(__sun)/& \&\& !defined(__APPLE__)/' \
@@ -950,6 +957,9 @@ bootstrap_zlib_core() {
 		# compiler to 32-bits code generation if requested here
 		export CC="${CC} -m32"
 	fi
+
+	export CPPFLAGS="${CPPFLAGS} -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+
 	local makeopts=()
 	# 1.2.5 suffers from a concurrency problem
 	[[ ${PV} == 1.2.5 ]] || read -r -a makeopts <<< "${MAKEOPTS}"

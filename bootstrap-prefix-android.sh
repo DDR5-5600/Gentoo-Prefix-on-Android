@@ -621,24 +621,8 @@ bootstrap_gnu() {
 	[[ -d ${S} ]] || return 1
 	cd "${S}" || return 1
 
-	# Tar upstream bug #59755 for broken build on macOS:
-	# https://savannah.gnu.org/bugs/index.php?59755
-	if [[ ${PN}-${PV} == "tar-1.32" ]] ; then
-		local tar_patch_file="tar-1.32-check-sys-ioctl-header-configure.patch"
-		local tar_patch_id="file_id=50554"
-		local tar_patch_url="https://file.savannah.gnu.org/file/${tar_patch_file}?${tar_patch_id}"
-		efetch "${tar_patch_url}" || return 1
-		# If fetched from upstream url instead of mirror, filename will
-		# have a suffix. Remove suffix by copy, not move, to not
-		# trigger refetch on repeated invocations of this script.
-		if [[ -f "${DISTDIR}/${tar_patch_file}?${tar_patch_id}" ]]; then
-			cp "${DISTDIR}/${tar_patch_file}"{"?${tar_patch_id}",} || return 1
-		fi
-		patch -p1 < "${DISTDIR}/${tar_patch_file}" || return 1
-	fi
-
 	local -a myconf
-	if [[ ${PN} == "make" && ${PV} == "4.2.1" ]] ; then
+	if [[ ${PN} == "make" && ${PV} == "4.4.1" ]] ; then
 		if [[ ${CHOST} == *-linux-gnu* ]] ; then
 			# force this, macros aren't set correctly with newer glibc
 			export CPPFLAGS="${CPPFLAGS} -D__alloca=alloca -D__stat=stat"
@@ -650,16 +634,6 @@ bootstrap_gnu() {
 		# recent GCC 1.4.17 and below only, on 1.4.18 this expression
 		# doesn't match
 		sed -i -e '/_GL_WARN_ON_USE (gets/d' lib/stdio.in.h lib/stdio.h
-
-		if [[ ${PV} == "1.4.18" ]] ; then
-			# macOS 10.13 have an issue with %n, which crashes m4
-			efetch "http://rsync.prefix.bitzolder.nl/sys-devel/m4/files/m4-1.4.18-darwin17-printf-n.patch" || return 1
-			patch -p1 < "${DISTDIR}"/m4-1.4.18-darwin17-printf-n.patch || return 1
-
-			# Bug 715880
-			efetch http://dev.gentoo.org/~heroxbd/m4-1.4.18-glibc228.patch || return 1
-			patch -p1 < "${DISTDIR}"/m4-1.4.18-glibc228.patch || return 1
-		fi
 	fi
 
 	if [[ ${PN} == "grep" ]] ; then
@@ -700,16 +674,17 @@ bootstrap_gnu() {
 
 	# On e.g. musl systems bash will crash with a malloc error if we use
 	# bash' internal malloc, so disable it during it this stage
-	[[ ${PN} == "bash" ]] && myconf+=( "--without-bash-malloc" )
-
+	if [[ ${PN} == "bash" ]] ; then
+		 myconf+=( "--without-bash-malloc" )
+	fi
 	# Ensure we don't read system-wide shell initialisation, it may
 	# contain cruft, bug #650284
-	[[ ${PN} == "bash" ]] && \
+	if [[ ${PN} == "bash" ]] ; then
 		export CPPFLAGS="${CPPFLAGS} \
 			-DSYS_BASHRC=\\\"${ROOT}/etc/bash/bashrc\\\" \
 			-DSYS_BASH_LOGOUT=\\\"${ROOT}/etc/bash/bash_logout\\\" \
 		"
-
+	fi
 	# Don't do ACL stuff on Darwin, especially Darwin9 will make
 	# coreutils completely useless (install failing on everything)
 	# Don't try using gmp either, it may be that just the library is
@@ -739,7 +714,9 @@ bootstrap_gnu() {
 	fi
 
 	# SuSE 11.1 has GNU binutils-2.20, choking on crc32_x86
-	[[ ${PN} == "xz" ]] && myconf+=( "--disable-assembler" )
+	if [[ ${PN} == "xz" ]] ; then
+		 myconf+=( "--disable-assembler" )
+	fi
 
 	if [[ ${PN} == "libffi" ]] ; then
 		# we do not have pkg-config to find lib/libffi-*/include/ffi.h

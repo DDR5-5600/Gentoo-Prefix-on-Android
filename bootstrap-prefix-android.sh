@@ -1107,7 +1107,7 @@ bootstrap_bzip2() {
 
 bootstrap_libressl() {
 	bootstrap_simple libressl 3.4.3 gz \
-		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL || \
+		https://ftp.openbsd.org/pub/OpenBSD/LibreSSL
 }
 
 bootstrap_stage_host_gentoo() {

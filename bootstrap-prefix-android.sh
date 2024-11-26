@@ -668,7 +668,9 @@ bootstrap_gnu() {
 	# On e.g. musl systems bash will crash with a malloc error if we use
 	# bash' internal malloc, so disable it during it this stage
 	if [[ ${PN} == "bash" ]] ; then
-		 myconf+=( "--without-bash-malloc" )
+		myconf+=( "--without-bash-malloc" )
+		efetch "https://raw.githubusercontent.com/termux/termux-packages/refs/heads/master/packages/bash/examples-loadables-getconf.c.patch"
+		patch -p1 < ${DISTDIR}/examples-loadables-getconf.c.patch || return 1
 	fi
 	# Ensure we don't read system-wide shell initialisation, it may
 	# contain cruft, bug #650284
